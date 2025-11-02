@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Tic Tac Toe — X vs O (Player vs CPU)</title>
+
+  <!-- Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root{
+      --bg: #f6f8fb;
+      --card: #ffffff;
+      --muted: #8b94a6;
+      --accent: #7f9cf5;
+      --accent-2: #caa6ff;
+      --x-color: #2b2f77;
+      --o-color: #d35400;
+      --win: #dff7e6;
+      --shadow: 0 6px 20px rgba(20,24,40,0.08);
+      --radius: 16px;
+    }
+    *{box-sizing:border-box}
+    body{
+      height:100vh;
+      margin:0;
+      font-family:"Poppins",sans-serif;
+      background:linear-gradient(180deg,#f2f6ff,var(--bg));
+      display:flex;
+      justify-content:center;
+      align-items:center;
+    }
+    .card{
+      background:var(--card);
+      box-shadow:var(--shadow);
+      border-radius:var(--radius);
+      padding:24px;
+      width:90%;
+      max-width:720px;
+      display:flex;
+      flex-wrap:wrap;
+      gap:20px;
+      justify-content:center;
+    }
+    h1{margin:0;font-size:22px;}
+    .subtitle{color:var(--muted);font-size:14px;}
+    .board{
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:10px;
+      width:300px;
+      height:300px;
+    }
+    .cell{
+      background:#fff;
+      border-radius:12px;
+      font-size:42px;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      cursor:pointer;
+      transition:0.2s;
+      box-shadow:inset 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .cell:hover{background:#f3f6ff;transform:scale(1.05);}
+    .cell.disabled{cursor:not-allowed;opacity:0.8;transform:none;}
+    .cell.x{color:var(--x-color);}
+    .cell.o{color:var(--o-color);}
+    .cell.win{background:var(--win)!important;transform:scale(1.1);}
+    .status{font-weight:600;margin:4px 0;}
+    .controls{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;}
+    button{
+      padding:8px 14px;
+      border:none;
+      border-radius:8px;
+      font-weight:600;
+      cursor:pointer;
+      transition:0.2s;
+    }
+    .btn-primary{background:linear-gradient(90deg,var(--accent),var(--accent-2));color:white;}
+    .btn-ghost{background:#f0f0f5;color:#333;}
+    .scoreboard{
+      display:flex;
+      justify-content:space-between;
+      width:100%;
+      max-width:300px;
+    }
+    .score{
+      background:#fff;
+      padding:8px 14px;
+      border-radius:10px;
+      box-shadow:0 2px 8px rgba(0,0,0,0.05);
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      width:48%;
+    }
+    select{
+      padding:6px 10px;
+      border-radius:8px;
+      border:1px solid #ccc;
+      font-weight:500;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div style="text-align:center;width:100%;">
+      <h1>Tic Tac Toe</h1>
+      <p class="subtitle">Mainkan <b>X</b> dan <b>O</b> — pilih mode permainan</p>
+    </div>
+
+    <div class="board" id="board"></div>
+
+    <div style="text-align:center;width:100%;">
+      <div class="status" id="statusText">Giliran: Player X</div>
+      <div class="subtitle" id="subText">Klik kotak untuk mulai.</div>
+    </div>
+
+    <div class="scoreboard">
+      <div class="score">
+        <span>Player X</span><b id="scoreX">0</b>
+      </div>
+      <div class="score">
+        <span>Player O</span><b id="scoreO">0</b>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button id="resetBtn" class="btn-primary">Reset Game</button>
+      <button id="resetScoreBtn" class="btn-ghost">Reset Score</button>
+      <select id="modeSelect">
+        <option value="pvp">2 Player</option>
+        <option value="cpu">Player vs CPU</option>
+      </select>
+    </div>
+  </div>
+
+  <script>
+    const boardEl = document.getElementById("board");
+    const statusText = document.getElementById("statusText");
+    const subText = document.getElementById("subText");
+    const scoreXEl = document.getElementById("scoreX");
+    const scoreOEl = document.getElementById("scoreO");
+    const resetBtn = document.getElementById("resetBtn");
+    const resetScoreBtn = document.getElementById("resetScoreBtn");
+    const modeSelect = document.getElementById("modeSelect");
+
+    let board = Array(9).fill("");
+    let currentPlayer = "X";
+    let playing = true;
+    let mode = "pvp";
+    let score = { X: 0, O: 0 };
+
+    const wins = [
+      [0,1,2],[3,4,5],[6,7,8],
+      [0,3,6],[1,4,7],[2,5,8],
+      [0,4,8],[2,4,6]
+    ];
+
+    function renderBoard(){
+      boardEl.innerHTML = "";
+      board.forEach((val, idx)=>{
+        const cell = document.createElement("div");
+        cell.className = "cell" + (val ? " " + val.toLowerCase() : "");
+        cell.textContent = val;
+        cell.addEventListener("click",()=>cellClick(idx));
+        if(!playing || val) cell.classList.add("disabled");
+        boardEl.appendChild(cell);
+      });
+    }
+
+    function cellClick(i){
+      if(!playing || board[i]) return;
+      board[i] = currentPlayer;
+      renderBoard();
+      const result = evaluate();
+      if(result.win){
+        highlight(result.win);
+        endGame(`${currentPlayer} menang!`);
+        score[currentPlayer]++;
+        updateScore();
+      }else if(result.draw){
+        endGame("Seri!");
+      }else{
+        currentPlayer = currentPlayer==="X"?"O":"X";
+        statusText.textContent = "Giliran: Player "+currentPlayer;
+        if(mode==="cpu" && currentPlayer==="O") setTimeout(cpuMove, 500);
+      }
+    }
+
+    function cpuMove(){
+      if(!playing) return;
+      let empty = board.map((v,i)=>v===""?i:null).filter(v=>v!==null);
+      if(empty.length===0) return;
+      // Simple random AI
+      const move = empty[Math.floor(Math.random()*empty.length)];
+      board[move] = "O";
+      renderBoard();
+      const result = evaluate();
+      if(result.win){
+        highlight(result.win);
+        endGame("CPU menang!");
+        score.O++;
+        updateScore();
+      }else if(result.draw){
+        endGame("Seri!");
+      }else{
+        currentPlayer = "X";
+        statusText.textContent = "Giliran: Player X";
+      }
+    }
+
+    function evaluate(){
+      for(const [a,b,c] of wins){
+        if(board[a] && board[a]===board[b] && board[a]===board[c]){
+          return {win:[a,b,c],winner:board[a]};
+        }
+      }
+      if(board.every(v=>v!=="")) return {draw:true};
+      return {};
+    }
+
+    function highlight(combo){
+      const cells=document.querySelectorAll(".cell");
+      combo.forEach(i=>cells[i].classList.add("win"));
+    }
+
+    function endGame(msg){
+      playing=false;
+      statusText.textContent=msg;
+      subText.textContent="Tekan Reset Game untuk mulai lagi.";
+    }
+
+    function resetGame(){
+      board=Array(9).fill("");
+      currentPlayer="X";
+      playing=true;
+      statusText.textContent="Giliran: Player X";
+      subText.textContent="Klik kotak untuk mulai.";
+      renderBoard();
+    }
+
+    function resetScore(){
+      score={X:0,O:0};
+      updateScore();
+    }
+
+    function updateScore(){
+      scoreXEl.textContent=score.X;
+      scoreOEl.textContent=score.O;
+    }
+
+    modeSelect.addEventListener("change",()=>{
+      mode=modeSelect.value;
+      resetGame();
+      subText.textContent= mode==="cpu" ? "Kamu adalah Player X, lawan CPU." : "Mode 2 pemain aktif.";
+    });
+
+    resetBtn.addEventListener("click",resetGame);
+    resetScoreBtn.addEventListener("click",resetScore);
+
+    renderBoard();
+  </script>
+</body>
+</html>
